@@ -7,7 +7,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Get your OpenRouter API key from environment
-OPENROUTER_API_KEY = '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'
+OPENROUTER_API_KEY = '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'
 
 @app.route("/chat", methods=["POST"])
 def chat():
