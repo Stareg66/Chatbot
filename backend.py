@@ -9,6 +9,7 @@ CORS(app)
 
 CONFIG_FILE = "userconfig.json"
 
+# Load user configuration from JSON file
 def load_config():
     if os.path.exists(CONFIG_FILE):
         try:
@@ -20,6 +21,7 @@ def load_config():
     return {}
 
 
+# Handles chat requests with full conversation history
 @app.route("/chat", methods=["POST"])
 def chat():
     config = load_config()
@@ -32,10 +34,19 @@ def chat():
         return jsonify({"error": "Missing API key, username, or model in configuration"}), 400
 
     data = request.get_json()
-    user_message = data.get("message", "").strip()
+    messages = data.get("messages", [])
 
-    if not user_message:
-        return jsonify({"error": "No message provided"}), 400
+    # Validate that messages exist and are in correct format
+    if not messages or not isinstance(messages, list):
+        return jsonify({"error": "No messages provided or invalid format"}), 400
+    
+    # Prepare messages for API with system prompt
+    api_messages = [
+        {"role": "system", "content": f"You are a helpful assistant. Provide the information {username} requires without overextending too much."}
+    ]
+
+    # Add conversation history
+    api_messages.extend(messages)
 
     # Call OpenRouter API
     try:
@@ -47,10 +58,7 @@ def chat():
             },
             json={
                 "model": model,
-                "messages": [
-                    {"role": "system", "content": "You are a helpful assistant. Provide the information {username} requires."},
-                    {"role": "user", "content": user_message},
-                ],
+                "messages": api_messages,
             },
             timeout=60,
         )
@@ -62,6 +70,8 @@ def chat():
         else:
             return jsonify({"error": response.text}), response.status_code
 
+    except requests.exceptions.Timeout:
+        return jsonify({"error": "Request timed out"}), 504
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 

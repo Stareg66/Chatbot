@@ -5,8 +5,9 @@ import os
 
 CONFIG_FILE = "userconfig.json"
 
+# Save API key, username and model to local config file.
 def save_config(api_key=None, username=None, model=None):
-    "Save API key, username and model to local config file."
+   
     data = {}
     if os.path.exists(CONFIG_FILE):
         try:
@@ -25,8 +26,8 @@ def save_config(api_key=None, username=None, model=None):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f)
 
+# Load API key, username and model from config file.
 def load_config():
-    "Load API key, username and model from config file."
     if os.path.exists(CONFIG_FILE):
         with open(CONFIG_FILE, "r") as f:
             try:
@@ -35,13 +36,17 @@ def load_config():
                 return {}
     return {}
 
+# Delete local config file.
 def clear_config():
-    "Delete local config file."
     if os.path.exists(CONFIG_FILE):
         os.remove(CONFIG_FILE)
 
 # Page Config
 st.set_page_config(page_title="Chatbot", page_icon="🤖", layout="centered")
+
+# Initialize session state for message history
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
 
 # Load saved data on start
 config_data = load_config()
@@ -60,7 +65,6 @@ st.write("Explore with the different OpenRouter models!")
 
 # Sidebar
 with st.sidebar:
-
     st.header("⚙️ Settings")
 
     # API & User Key management
@@ -69,7 +73,6 @@ with st.sidebar:
         api_key_input = st.text_input("🔑 OpenRouter API key:", type="password")
         if st.button("💾 Save"):
             if api_key_input.strip():
-                # Save both username and API key
                 st.session_state["api_key"] = api_key_input.strip()
                 st.session_state["username"] = username_input.strip()
                 save_config(api_key_input.strip(), username_input.strip())
@@ -84,6 +87,7 @@ with st.sidebar:
             st.session_state.pop("api_key", None)
             st.session_state.pop("username", None)
             st.session_state.pop("selected_model", None)
+            st.session_state["messages"] = []  # Clear message history
             st.rerun()
 
     # Model selection (only after key is set)
@@ -120,32 +124,75 @@ with st.sidebar:
         except Exception as e:
             st.error(f"Error fetching models: {e}")     
 
+        # Clear conversation button
+        st.markdown("---")
+        if st.button("🗑️ Clear Conversation"):
+            st.session_state["messages"] = []
+            st.rerun()
 
-# Main Interaction
-st.header("Main Interaction")
-user_input = st.text_input("Type something:", "")
 
-if st.button("Send"):
-    if user_input.strip() == "":
-        st.warning("Please enter a message first.")
-    else:
-        # Send POST request to backend
+# Main Chat Interface
+st.header("💬 Chat")
+
+# Display conversation history
+if st.session_state["messages"]:
+    for msg in st.session_state["messages"]:
+        if msg["role"] == "user":
+            with st.chat_message("user"):
+                st.write(msg["content"])
+        elif msg["role"] == "assistant":
+            with st.chat_message("assistant"):
+                st.write(msg["content"])
+
+
+# Chat input
+if "api_key" in st.session_state:
+    user_input = st.chat_input("Type your message here...")
+
+    if user_input:
+        # Add user message to history
+        st.session_state["messages"].append({"role": "user", "content": user_input})
+        
+        # Display user message immediately
+        with st.chat_message("user"):
+            st.write(user_input)
+
+        # Send conversation history to backend
         try:
-            response = requests.post(
-                "http://127.0.0.1:5000/chat",
-                json={"message": user_input}
-            )
+            with st.spinner("Thinking..."):
+                response = requests.post(
+                    "http://127.0.0.1:5000/chat",
+                    json={"messages": st.session_state["messages"]},
+                    timeout=60
+                )
+            
             if response.status_code == 200:
                 data = response.json()
-                st.success(f"Response: {data['reply']}")
+                assistant_reply = data["reply"]
+                
+                # Add assistant response to history
+                st.session_state["messages"].append({
+                    "role": "assistant", 
+                    "content": assistant_reply
+                })
+                
+                # Display assistant response
+                with st.chat_message("assistant"):
+                    st.write(assistant_reply)
+                
+                st.rerun()
             else:
                 try:
                     data = response.json()
-                    st.error(data.get("error", f"Error {response.status_code}"))
+                    st.error(f"Error: {data.get('error', f'Status {response.status_code}')}")
                 except:
                     st.error(f"Error {response.status_code}: {response.text}")
+        except requests.exceptions.Timeout:
+            st.error("Request timed out. Please try again.")
         except Exception as e:
             st.error(f"Failed to reach backend: {e}")
+else:
+    st.info("👈 Please enter your API key in the sidebar to start chatting.")
 
 # Footer
 st.markdown("---")
