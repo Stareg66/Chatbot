@@ -63,7 +63,7 @@ with st.sidebar:
 
     st.header("⚙️ Settings")
 
-    # --- API & User Key management ---
+    # API & User Key management
     if "api_key" not in st.session_state:
         username_input = st.text_input("👤 Username:", value=st.session_state.get("username", ""))
         api_key_input = st.text_input("🔑 OpenRouter API key:", type="password")
@@ -86,7 +86,7 @@ with st.sidebar:
             st.session_state.pop("selected_model", None)
             st.rerun()
 
-    # --- Model selection (only after key is set) ---
+    # Model selection (only after key is set)
     if "api_key" in st.session_state:
         st.markdown("---")
         st.subheader("🧠 Model Selection")
@@ -139,7 +139,11 @@ if st.button("Send"):
                 data = response.json()
                 st.success(f"Response: {data['reply']}")
             else:
-                st.error(f"Error {response.status_code}: {response.text}")
+                try:
+                    data = response.json()
+                    st.error(data.get("error", f"Error {response.status_code}"))
+                except:
+                    st.error(f"Error {response.status_code}: {response.text}")
         except Exception as e:
             st.error(f"Failed to reach backend: {e}")
 
