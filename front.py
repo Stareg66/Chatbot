@@ -61,7 +61,7 @@ if "selected_model" not in st.session_state and "model" in config_data:
 
 # Header 
 st.title("🚀 AI Chatbot")
-st.write("Explore with the different OpenRouter models!")
+st.write("Explore with different OpenRouter models!")
 
 # Sidebar
 with st.sidebar:
